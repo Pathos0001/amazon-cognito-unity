@@ -1,0 +1,16 @@
+{
+  "shapeModifiers": {
+    "EndpointType": {
+      "modify": [
+        {
+          "EndpointType": { "emitPropertyName": "ReplicationEndpointType" }
+        }
+      ]
+    }
+  },
+  "shapeSubstitutions": {
+    "Event": {
+      "renameShape" :  "DMSEvent"
+    }
+  }
+}

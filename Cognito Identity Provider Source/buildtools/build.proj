@@ -1,0 +1,509 @@
+<Project ToolsVersion="14.0" 
+    DefaultTargets="full-build-nodocs"
+    xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <InternalBuildTools Condition="'$(InternalBuildTools)'==''">..\..\AWSDotNetBuildTools</InternalBuildTools>
+        <DisablePCLSupport Condition="'$(DisablePCLSupport)'==''">false</DisablePCLSupport>
+        <DisableUnitySupport Condition="'$(DisableUnitySupport)'==''">false</DisableUnitySupport>
+        <PartialBuildList Condition="'$(PartialBuildList)'==''"></PartialBuildList>
+
+		<VSToolsPath Condition="'$(VSToolsPath)' == ''">C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v14.0</VSToolsPath>
+		
+        <GeneratorDisablePCLSupport Condition="'$(DisablePCLSupport)'=='true'">-disable.pcl-support</GeneratorDisablePCLSupport>
+
+        <SmokeBuild></SmokeBuild>
+
+        <!-- perform a release build by default -->
+        <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+
+        <TestWrapperAssembly>TestWrapper\TestRunners\bin\Debug\TestWrapper.dll</TestWrapperAssembly>
+        <CustomTasksAssembly>CustomTasks\bin\Debug\CustomTasks.dll</CustomTasksAssembly>
+        <TestAnalyzerAssembly>..\sdk\test\TestAnalyzer\IntegrationTestsAnalyzer\bin\Debug\IntegrationTestsAnalyzer.dll</TestAnalyzerAssembly>
+        <RunIntegTests Condition="'$(RunIntegTests)'=='' And '$(IntegCategoriesToTest)' != ''">true</RunIntegTests>
+    </PropertyGroup>
+
+    <Import Project="$(InternalBuildTools)\references.targets" Condition="Exists('$(InternalBuildTools)\references.targets')" />
+    <Import Project="common.targets" />
+	
+	<Import Project="$(VSToolsPath)\DotNet\Microsoft.DotNet.Props" Condition="'$(VSToolsPath)' != ''" />
+	<Import Project="$(VSToolsPath)\DotNet\Microsoft.DotNet.targets" Condition="'$(VSToolsPath)' != ''" />
+
+	<PropertyGroup>
+		<GeneratorUnityPath>--unitypath &quot;$(unitypath)&quot;</GeneratorUnityPath>
+	</PropertyGroup>
+	
+    <!-- properties used in documentation generation -->
+    <PropertyGroup>
+        <!-- resources folder where test settings should be placed -->
+        <TestSettingsLocation>..\sdk\test\CrossPlatformTests\CommonTests\Resources</TestSettingsLocation>
+        <RunKeyScan Condition="'$(RunKeyScan)'==''">false</RunKeyScan>
+    </PropertyGroup>
+
+    <Choose>
+        <When Condition="'$(PartialBuildList)'==''">
+            <PropertyGroup>
+                <Net35SolutionsFile>AWSSDK.Net35.sln</Net35SolutionsFile>
+                <Net45SolutionsFile>AWSSDK.Net45.sln</Net45SolutionsFile>
+                <PCLSolutionsFile>AWSSDK.PCL.sln</PCLSolutionsFile>
+                <UnitySolutionsFile>AWSSDK.Unity.sln</UnitySolutionsFile>
+                <CoreCLRSolutionFile>AWSSDK.CoreCLR.sln</CoreCLRSolutionFile>
+                <Net35UnitTestProject>AWSSDK.UnitTests.Net35.csproj</Net35UnitTestProject>
+                <Net45UnitTestProject>AWSSDK.UnitTests.Net45.csproj</Net45UnitTestProject>
+                <CoreCLRUnitTests>UnitTests.CoreCLR.csproj</CoreCLRUnitTests>
+                <GeneratorPartialBuildArgument></GeneratorPartialBuildArgument>
+                <ReferenceServiceDLLs>false</ReferenceServiceDLLs>
+                <FxCop35TargetFileName>SDK-3.5.FxCop</FxCop35TargetFileName>
+                <FxCop45TargetFileName>SDK-4.5.FxCop</FxCop45TargetFileName>
+                <BCLUnitTestCategories></BCLUnitTestCategories>
+                <CoreCLRTestCategories></CoreCLRTestCategories>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <Net35SolutionsFile>Build.Net35.partial.sln</Net35SolutionsFile>
+                <Net45SolutionsFile>Build.Net45.partial.sln</Net45SolutionsFile>
+                <PCLSolutionsFile>Build.PCL.partial.sln</PCLSolutionsFile>
+                <UnitySolutionsFile>AWSSDK.Unity.sln</UnitySolutionsFile>
+                <CoreCLRSolutionFile>Build.CoreCLR.partial.sln</CoreCLRSolutionFile>
+                <Net35UnitTestProject>Build.UnitTests.Net35.partial.csproj</Net35UnitTestProject>
+                <Net45UnitTestProject>Build.UnitTests.Net45.partial.csproj</Net45UnitTestProject>
+                <CoreCLRUnitTests>UnitTests.CoreCLR.csproj</CoreCLRUnitTests>
+                <GeneratorPartialBuildArgument>--partial-build-list $(PartialBuildList)</GeneratorPartialBuildArgument>
+                <ReferenceServiceDLLs>true</ReferenceServiceDLLs>
+                <FxCop35TargetFileName>SDK-3.5.partial.FxCop</FxCop35TargetFileName>
+                <FxCop45TargetFileName>SDK-4.5.partial.FxCop</FxCop45TargetFileName>
+                <BCLUnitTestCategories>Runtime,$(PartialBuildList)</BCLUnitTestCategories>
+                <CoreCLRTestCategories>Core,$(PartialBuildList)</CoreCLRTestCategories>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <Target Name="build-buildtools"
+            DependsOnTargets="build-custom-tasks;build-test-wrapper;build-test-analyzer" />
+
+    <Target Name="build-custom-tasks" Condition="!Exists($(CustomTasksAssembly))">
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore .\CustomTasks\CustomTasks.sln" />
+
+        <MSBuild Projects=".\CustomTasks\CustomTasks.sln"
+            Targets="Clean;Build"
+            Properties="Configuration=Debug" />
+    </Target>
+
+    <Target Name="build-test-wrapper" Condition="!Exists($(TestWrapperAssembly))">
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore .\TestWrapper\TestWrapper.sln" />
+
+        <MSBuild Projects=".\TestWrapper\TestWrapper.sln"
+            Targets="Clean;Build"
+            Properties="Configuration=Debug"/>
+    </Target>
+
+    <Target Name="build-test-analyzer" Condition="!Exists($(TestAnalyzerAssembly))">
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore ..\sdk\test\TestAnalyzer\TestAnalyzer.sln" />
+
+        <MSBuild Projects="..\sdk\test\TestAnalyzer\TestAnalyzer.sln"
+            Targets="Clean;Build"
+            Properties="Configuration=Debug"/>
+    </Target>
+
+    <Target Name="clean-buildtools" DependsOnTargets="clean-common">
+        <Delete Files="$(TestWrapperAssembly)" />
+        <Delete Files="$(CustomTasksAssembly)" />
+        <Delete Files="$(TestAnalyzerAssembly)" />
+    </Target>
+
+    <UsingTask TaskName="CustomTasks.UpdateFxCopProject" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="CustomTasks.XamarinComponent" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="CustomTasks.UnityPackage" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="CustomTasks.UnityBuild" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="CustomTasks.TimingTask" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="CustomTasks.ValidateIntegTests" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="TestWrapper.MsTestWrapperTask" AssemblyFile="$(TestWrapperAssembly)"/>
+    <UsingTask TaskName="TestWrapper.XUnitWrapperTask" AssemblyFile="$(TestWrapperAssembly)"/>
+
+    <Target Name="init" DependsOnTargets="clean-buildtools;build-buildtools">
+        <Message Text="Running SDK generation and build for configuration: $(Configuration)" Importance="normal" />
+
+        <TimingTask />
+
+        <Copy
+            SourceFiles="trx-transform.xsl"
+            DestinationFolder="$(Deployment)" />
+    </Target>
+
+    <Target Name="full-build" DependsOnTargets="test-sdk;copy-assemblies;copy-service-models;unity-pack;keyscan;consolidate-docartifacts;save-build"/>
+
+    <Target Name="full-build-nodocs" DependsOnTargets="test-sdk;package-extensions;keyscan;copy-assemblies;copy-service-models;unity-pack;save-build"/>
+
+    <Target Name="restore-nuget">
+        <Message Text="Restore nuget packages"/>
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore ..\sdk\$(PCLSolutionsFile)"/>
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore ..\sdk\$(UnitySolutionsFile)"/>
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore ..\sdk\AWSSDK.CodeAnalysis.sln"/>
+    </Target>
+
+    <Target Name="run-generator">
+        <Message Text="Build and run code generator"/>
+        <Exec Command="..\sdk\.nuget\NuGet.exe restore ..\generator\AWSSDKGenerator.sln"/>
+        <MSBuild Projects="..\generator\AWSSDKGenerator.sln"
+            Targets="Clean;Build"
+            Properties="Configuration=Release" />
+        <Exec Command="ServiceClientGenerator.exe $(GeneratorDisablePCLSupport) $(GeneratorUnityPath) $(GeneratorPartialBuildArgument)"
+            WorkingDirectory="..\generator\ServiceClientGenerator\bin\Release"/>
+    </Target>
+
+    <Target Name="build-sdk" DependsOnTargets="populate-deployment;build-sdk-desktop;build-code-analysis;build-sdk-pcl;build-sdk-unity;build-sdk-coreclr;copy-assemblies">
+        <Copy
+            SourceFiles="..\generator\ServiceModels\_sdk-versions.json"
+            DestinationFolder="$(Deployment)" />
+    </Target>
+
+    <Target Name="build-sdk-desktop" DependsOnTargets="GetSDKToolingInfoTarget;run-generator;restore-nuget">
+        <Message Text="Restore and compile .Net35 SDK"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(Net35SolutionsFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(Net35SolutionsFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) --no-incremental $(Net35SolutionsFile) /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true" WorkingDirectory="..\sdk"/>
+
+        <Message Text="Restore and compile .Net45 SDK"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(Net45SolutionsFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(Net45SolutionsFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) --no-incremental $(Net45SolutionsFile) /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true" WorkingDirectory="..\sdk"/>
+    </Target>
+
+	<Target Name="build-code-analysis" DependsOnTargets="restore-nuget;run-generator">
+		<MSBuild Projects="..\sdk\AWSSDK.CodeAnalysis.sln"
+					Targets="Clean;Build"
+					Properties="Configuration=$(Configuration);AWSKeyFile=$(CustomSnkFileLocation)" />
+	</Target>
+
+    <Target Name="build-sdk-pcl" DependsOnTargets="restore-nuget;run-generator" Condition="!$(DisablePCLSupport)">
+        <Message Text="Compile the Portable Class Library SDK"/>
+        <MSBuild Projects="..\sdk\$(PCLSolutionsFile)"
+            Targets="Clean;Build"
+            Properties="Configuration=$(Configuration);AWSKeyFile=$(CustomSnkFileLocation);ResolveNuGetPackages=false" />
+    </Target>
+
+    <Target Name="build-sdk-coreclr" DependsOnTargets="GetSDKToolingInfoTarget">
+        <Message Text="Restore and compile CoreCLR version of the SDK"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(CoreCLRSolutionFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(CoreCLRSolutionFile)" WorkingDirectory="..\sdk"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) --no-incremental $(CoreCLRSolutionFile) /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true" WorkingDirectory="..\sdk"/>
+    </Target>
+	
+	<Target Name="build-sdk-unity" DependsOnTargets="restore-nuget;run-generator" Condition="!$(DisableUnitySupport)">
+		<Message Text="Compile the Unity SDK"/>
+		<MSBuild Projects="..\sdk\$(UnitySolutionsFile)"
+			Targets="Clean;Build"
+			Properties="Configuration=$(Configuration);AWSKeyFile=$(CustomSnkFileLocation);ResolveNuGetPackages=false" />
+	</Target>
+
+    <Target Name="test-sdk" DependsOnTargets="init;build-sdk;fxcop;run-unit-tests;run-integ-tests" />
+
+    <Target Name="validate-integ-tests" DependsOnTargets="build-custom-tasks">
+        <ValidateIntegTests
+            TestAssembly="..\sdk\test\IntegrationTests\bin\$(Configuration)\net35\AWSSDK.IntegrationTests.Net35.dll"
+            WaitForDebugger="false"
+            />
+        <ValidateIntegTests
+            TestAssembly="..\sdk\test\IntegrationTests\bin\$(Configuration)\net45\AWSSDK.IntegrationTests.Net45.dll"
+            WaitForDebugger="false"
+            />
+    </Target>
+
+    <Target Name="build-tests" Condition="'$(PartialBuildList)'!=''" DependsOnTargets="GetSDKToolingInfoTarget">
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(Net35UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(Net35UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) $(Net35UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(Net45UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(Net45UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) $(Net45UnitTestProject)" WorkingDirectory="..\sdk\test\UnitTests"/>
+
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  $(CoreCLRUnitTests)" WorkingDirectory="..\sdk\test\CoreCLR\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean -c $(Configuration) $(CoreCLRUnitTests)" WorkingDirectory="..\sdk\test\CoreCLR\UnitTests"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) $(CoreCLRUnitTests)" WorkingDirectory="..\sdk\test\CoreCLR\UnitTests"/>
+    </Target>
+
+    <Target Name="run-unit-tests" DependsOnTargets="init;build-sdk;build-tests;build-test-wrapper;GetSDKToolingInfoTarget" >
+        <MsTestWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\sdk\test\UnitTests\$(Net35UnitTestProject)"
+            Configuration="$(Configuration)"
+            Categories="$(BCLUnitTestCategories)"/>
+
+        <MsTestWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\sdk\test\UnitTests\$(Net45UnitTestProject)"
+            Configuration="$(Configuration)"
+            Categories="$(BCLUnitTestCategories)"/>
+
+        <XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\sdk\test\CoreCLR\UnitTests\UnitTests.CoreCLR.csproj"
+            Configuration="$(Configuration)"
+            Categories="$(CoreCLRTestCategories)"/>
+    </Target>
+
+    <Target Name="run-integ-tests" Condition="'$(RunIntegTests)' != '' And '$(RunIntegTests)' != 'false'" DependsOnTargets="init;build-sdk;validate-integ-tests">
+        <MsTestWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\sdk\test\IntegrationTests\AWSSDK.IntegrationTests.Net45.csproj"
+            Configuration="$(Configuration)"
+            Categories="$(IntegCategoriesToTest)"/>
+
+        <XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\sdk\test\CoreCLR\IntegrationTests\IntegrationTests.CoreCLR.csproj"
+            Configuration="$(Configuration)"
+            Categories="$(IntegCategoriesToTest)"
+            />
+    </Target>
+
+    <Target Name="nuget-pack" Condition="'$(Configuration)' == 'Release'">
+        <Exec LogStandardErrorAsError="true"
+              Command="$(powershell) -ExecutionPolicy Unrestricted -NoProfile -File create-nuget-packages.ps1 -PackageList &quot;$(PartialBuildList)&quot;"/>
+    </Target>
+
+    <Target Name="unity-pack" DependsOnTargets="build-custom-tasks;nuget-pack;copy-assemblies;pdb-mdb" Condition="!$(DisableUnitySupport) And $(SmokeBuild) == ''">
+        <UnityPackage
+            DeploymentPath="$([System.IO.Path]::GetFullPath(..\Deployment\))"
+            ServiceName="@(XamFiles)"
+            ToolsPath="$([System.IO.Path]::GetFullPath(UnityTools))"
+            UnityExe="$(unity)"  />
+
+    </Target>
+
+	<!-- DependsOnTargets="copy-assemblies" -->
+	<!-- Exists('$(pdb2mdbexe)') -->
+	<Target Name="pdb-mdb"  DependsOnTargets="copy-assemblies"  Condition="False">
+		<ItemGroup>
+			<DllFiles Include="$(Deployment)\assemblies\unity\*.dll"/>
+		</ItemGroup>
+
+		<Exec LogStandardErrorAsError="true" Command="$(mono) $(pdb2mdb) %(DllFiles.Identity)" />
+	</Target>
+
+	<Target Name="update-unity-tests" DependsOnTargets="build-custom-tasks;build-sdk-unity" Condition="!$(DisableUnitySupport)">
+
+		<!-- delete the sdk folder and its contents -->
+		<RemoveDir Directories="..\sdk\test\Unity\Unity3DTests\Assets\SDK" />
+		<MakeDir Directories="..\sdk\test\Unity\Unity3DTests\Assets\SDK" />
+
+		<!-- copy all new assemblies to the test project -->
+		<ItemGroup>
+			<DllFiles Include="..\sdk\src\Core\bin\$(Configuration)\unity\AWSSDK.*.dll"/>
+			<PdbFiles Include="..\sdk\src\Core\bin\$(Configuration)\unity\AWSSDK.*.pdb"/>
+
+			<DllFiles Include="..\sdk\src\Services\**\bin\$(Configuration)\unity\AWSSDK.*.dll"/>
+			<PdbFiles Include="..\sdk\src\Services\**\bin\$(Configuration)\unity\AWSSDK.*.pdb"/>
+		</ItemGroup>
+
+		<Copy
+            SourceFiles="@(DllFiles)"
+            DestinationFolder="..\sdk\test\Unity\Unity3DTests\Assets\SDK"/>
+		<Copy
+            SourceFiles="@(PdbFiles)"
+            DestinationFolder="..\sdk\test\Unity\Unity3DTests\Assets\SDK"/>
+
+		<!-- need to copy credentials as well -->
+
+	</Target>
+
+	<Target Name="build-unity-test" DependsOnTargets="update-unity-tests" Condition="!$(DisableUnitySupport)">
+
+		<!-- build the projects
+		<MakeDir Directories="$(Deployment)" />
+		<MakeDir Directories="$(Deployment)\unity" /> -->
+		<MakeDir Directories="$(Deployment)\unity\build" />
+
+		<UnityBuild
+			DeploymentPath="$([System.IO.Path]::GetFullPath(..\Deployment\))"
+			UnityExe="$(unity)"
+			ProjectPath="$([System.IO.Path]::GetFullPath(..\sdk\test\Unity\Unity3DTests\))"
+			Platform="android"
+			/>
+
+		<UnityBuild
+			DeploymentPath="$([System.IO.Path]::GetFullPath(..\Deployment\))"
+			UnityExe="$(unity)"
+			ProjectPath="$([System.IO.Path]::GetFullPath(..\sdk\test\Unity\Unity3DTests\))"
+			Platform="ios64"
+			/>
+
+        <!-- ios mono requires nunit customization
+		<UnityBuild
+			DeploymentPath="$([System.IO.Path]::GetFullPath(..\Deployment\))"
+			UnityExe="$(unity)"
+			ProjectPath="$([System.IO.Path]::GetFullPath(..\sdk\test\Unity\Unity3DTests\))"
+			Platform="ios32"
+			/>
+		-->
+	</Target>
+	
+	
+    <Target Name="build-netcore-extensions" DependsOnTargets="GetSDKToolingInfoTarget">
+        <!-- depends: restore-nuget;run-generator -->
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  AWSSDK.Extensions.sln"  WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean AWSSDK.Extensions.sln"    WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) AWSSDK.Extensions.sln /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true"  WorkingDirectory="..\extensions"/>
+
+		<Message Text="Build and Test .NET Core Setup Extension"/>
+		<XUnitWrapperTask
+			TestSuiteRunner="$(SDKToolingExe)"
+			TestContainer="..\extensions\test\NETCore.SetupTests\NETCore.SetupTests.csproj"
+			Configuration="$(Configuration)"
+			/>
+	</Target>
+
+
+    <Target Name="build-cognito-auth-extension-coreCLR" DependsOnTargets="GetSDKToolingInfoTarget">
+        <Message Text="Build and Test Cognito Authentication Extension"/>
+        
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  CognitoAuthentication.CoreCLR.sln"    WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean CognitoAuthentication.CoreCLR.sln"      WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) --no-incremental CognitoAuthentication.CoreCLR.sln /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true" WorkingDirectory="..\extensions"/>
+    </Target>
+
+    <Target Name="build-cognito-auth-extension-net45" DependsOnTargets="GetSDKToolingInfoTarget">
+        <Message Text="Build and Test Cognito Authentication Extension"/>
+        
+        <Exec Command="&quot;$(SDKToolingExe)&quot; restore -f  CognitoAuthentication.NET45.sln"    WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; clean CognitoAuthentication.NET45.sln"      WorkingDirectory="..\extensions"/>
+        <Exec Command="&quot;$(SDKToolingExe)&quot; build -c $(Configuration) --no-incremental CognitoAuthentication.NET45.sln /p:AWSKeyFile=$(CustomSnkFileLocation);SignAssembly=true" WorkingDirectory="..\extensions"/>
+    </Target>
+
+        <Target Name="test-cognito-auth-extension" DependsOnTargets="build-cognito-auth-extension-net45;build-cognito-auth-extension-coreCLR" Condition="'$(RunIntegTests)' != '' And '$(RunIntegTests)' != 'false'">
+            <XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\extensions\test\CognitoAuthentication.UnitTests\CognitoAuthentication.UnitTests.CoreCLR.csproj"
+            Configuration="$(Configuration)"/> 
+         <XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\extensions\test\CognitoAuthentication.IntegrationTests\CognitoAuthentication.IntegrationTests.CoreCLR.csproj"
+            Configuration="$(Configuration)"/> 
+        <!--<XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\extensions\test\CognitoAuthentication.UnitTests\CognitoAuthentication.UnitTests.NET45.csproj"
+            Configuration="$(Configuration)"/> 
+         <XUnitWrapperTask
+            TestSuiteRunner="$(SDKToolingExe)"
+            TestContainer="..\extensions\test\CognitoAuthentication.IntegrationTests\CognitoAuthentication.IntegrationTests.NET45.csproj"
+            Configuration="$(Configuration)"/>
+        -->
+    </Target>
+
+    <Target Name="package-extensions" DependsOnTargets="init;package-netcore-extensions;package-cognito-auth-extension"/>
+
+	<Target Name="package-netcore-extensions" DependsOnTargets="build-netcore-extensions">
+        <MakeDir Directories="..\Deployment\nuget" />
+		<Exec Command="..\..\..\sdk\.nuget\NuGet.exe pack .\AWSSDK.Extensions.NETCore.Setup.nuspec -BasePath . -OutputDirectory ..\..\..\Deployment\nuget" WorkingDirectory="..\extensions\src\AWSSDK.Extensions.NETCore.Setup" />
+	</Target>
+
+    <Target Name="package-cognito-auth-extension" DependsOnTargets="build-cognito-auth-extension-net45;build-cognito-auth-extension-coreCLR;test-cognito-auth-extension">
+        <MakeDir Directories="..\Deployment\nuget" />
+        <Exec Command="..\..\..\sdk\.nuget\NuGet.exe pack .\AWSSDK.Extensions.CognitoAuthentication.nuspec -BasePath . -OutputDirectory ..\..\..\Deployment\nuget" WorkingDirectory="..\extensions\src\AWSSDK.Extensions.CognitoAuthentication" />
+    </Target>   
+	
+    <Target Name="copy-assemblies" DependsOnTargets="nuget-pack">
+        <Message Text="Collating assemblies for downstream doc generation" />
+        <PropertyGroup>
+            <CustomSnkPublicKeyToken Condition="'$(CustomSnkPublicKeyToken)' == '' ">71c852f8be1c371d</CustomSnkPublicKeyToken>
+        </PropertyGroup>
+        <Exec LogStandardErrorAsError="true"
+              Command="$(powershell) -ExecutionPolicy Unrestricted -NoProfile -File copy-sdkassemblies.ps1 -PublicKeyTokenToCheck $(CustomSnkPublicKeyToken) -BuildType $(Configuration) -ServiceList &quot;$(PartialBuildList)&quot;"/>
+    </Target>
+
+    <Target Name="copy-service-models" DependsOnTargets="copy-assemblies">
+        <Message Text="Collating service models for downstream tooling" />
+		
+		<ItemGroup>
+			<ServiceModels Include="..\generator\ServiceModels\*" />
+		</ItemGroup>
+		
+		<Copy SourceFiles="@(ServiceModels)" DestinationFolder="$(Deployment)\models" />
+	</Target>
+	
+    <!-- TEST TARGETS/TASKS -->
+
+    <Target Name="fxcop" DependsOnTargets="init;copy-assemblies" Condition="Exists('$(fxcopcmdexe)') And ($(Configuration) == 'Release')">
+        <!-- Update FxCop project files -->
+        <UpdateFxCopProject Assemblies="$(Deployment)\assemblies\net35" FxCopProject="..\sdk\SDK-3.5.FxCop" FxCopTargetProject="..\sdk\$(FxCop35TargetFileName)" BinSuffix="net35" TargetServices="$(PartialBuildList)"/>
+        <UpdateFxCopProject Assemblies="$(Deployment)\assemblies\net45" FxCopProject="..\sdk\SDK-4.5.FxCop" FxCopTargetProject="..\sdk\$(FxCop45TargetFileName)" BinSuffix="net45" TargetServices="$(PartialBuildList)"/>
+
+        <!-- Compile custom FxCop rules -->
+        <MSBuild Projects="..\buildtools\CustomFxCopRules\CustomFxCopRules.sln"
+            Targets="Clean;Build"
+            Properties="Configuration=Release" />
+
+        <!-- Run FxCop -->
+        <Exec Command="$(fxcopcmd) /p:..\sdk\$(FxCop35TargetFileName) /o:..\fxcop-report-3.5.xml /s"/>
+        <Exec Command="$(fxcopcmd) /p:..\sdk\$(FxCop45TargetFileName) /o:..\fxcop-report-4.5.xml /s"/>
+
+        <Error Condition="Exists('..\fxcop-report-3.5.xml') or Exists('..\fxcop-report-4.5.xml')" Text="There are FxCop violations!" />
+    </Target>
+
+    <UsingTask TaskName="PrepareTestResults" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
+        <ParameterGroup>
+            <ResultFile ParameterType="System.String" Required="true" />
+        </ParameterGroup>
+        <Task>
+            <Code Type="Fragment" Language="cs">
+                <![CDATA[
+                    Log.LogMessage("ResultFile = [{0}], formatting", ResultFile);
+                    string content = File.ReadAllText(ResultFile);
+                    content = content.Replace("<?xml version=\"1.0\" encoding=\"UTF-8\"?>","<?xml version=\"1.0\" encoding=\"UTF-8\"?><?xml-stylesheet type=\"text/xsl\" href=\"trx-transform.xsl\"?>");
+                    File.WriteAllText(ResultFile + ".xml", content);
+                ]]>
+            </Code>
+        </Task>
+    </UsingTask>
+
+    <Target Name="keyscan"
+            Condition="Exists('$(InternalBuildTools)\references.targets') And $(RunKeyScan)"
+            DependsOnTargets="build-tools">
+        <ItemGroup>
+            <PrivateKeyException Include="generator\ServiceModels\acm\acm-2015-12-08.normal.json" />
+            <PrivateKeyException Include="generator\ServiceModels\ec2\ec2-2014-02-01.normal.json" />
+            <PrivateKeyException Include="generator\ServiceModels\iam\iam-2010-05-08.normal.json" />
+            <PrivateKeyException Include="sdk\code-analysis\ServiceAnalysis\CertificateManager\Generated\PropertyValueRules.xml" />
+            <PrivateKeyException Include="sdk\test\UnitTests\Custom\EC2\PasswordTest.cs" />
+            <PrivateKeyException Include="sdk\test\CoreCLR\UnitTests\sample.rsa.private.key.txt" />
+            <PrivateKeyException Include="sdk\test\UnitTests\Custom\CloudFront\sample.rsa.private.key.txt" />
+        </ItemGroup>
+		
+		<ItemGroup>
+			<FileException Include="generator\ServiceModels\elasticbeanstalk\elasticbeanstalk.examples.json" />
+			<FileException Include="generator\ServiceClientGenerator\bin\Release\customizations\elasticbeanstalk.customizations.json" />
+		</ItemGroup>
+
+        <KeyScannerTask
+            Folder="$(MSBuildProjectDirectory)\.."
+            FilePattern="**"
+            PrivateKeyExceptions="@(PrivateKeyException)"
+			FileExceptions="@(FileException)"
+            ParallelScan="true"
+            />
+
+    </Target>
+
+    <Target Name="save-build" Condition="Exists('$(InternalBuildTools)\references.targets')=='true'" DependsOnTargets="build-tools">
+        <SaveBuildArtifactTask
+            RepositoryRoot="$(MSBuildProjectDirectory)\.."
+            BuildArtifactType="sdk"
+            GitBranch="$(SaveReferenceGitBranch)"
+            LocalArchiveRootFolder="$(LocalArchiveRootFolder)"
+            />
+    </Target>
+
+    <Target Name="populate-deployment" Condition="Exists('$(InternalBuildTools)\references.targets') And '$(ReferenceServiceDLLs)'" DependsOnTargets="build-tools">
+        <PrepopulateDeploymentFolder
+            BuildArtifactType="sdk"
+            DeploymentFolder="$(Deployment)"
+            GitBranch="last-release"/>
+    </Target>
+
+    <Target Name="prepare-tests" Condition="'$(TestSettingsFile)' != ''">
+        <Copy
+            SourceFiles="$(TestSettingsFile)"
+            DestinationFolder="$(TestSettingsLocation)" />
+    </Target>
+</Project>
